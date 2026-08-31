@@ -807,7 +807,7 @@ try{if(localStorage.getItem('campo_tema')==='1')document.body.classList.add('osc
 
     <div class="panel" data-g="control">
       <h2><span class="pin"></span>Cargar por WhatsApp</h2>
-      <p class="mini-nota" style="margin-top:-8px;margin-bottom:14px">Podés cargar movimientos hablándole a un WhatsApp: le escribís "gasté 5 mil en el súper con Mercado Pago", te muestra qué entendió, confirmás con <b>SÍ</b>, y cuando abrís la app acá aparecen solos. Poné tu número (el mismo con el que le escribís al bot).</p>
+      <p class="mini-nota" style="margin-top:-8px;margin-bottom:14px">Podés cargar movimientos hablándole a un WhatsApp: le escribís o le mandás un audio ("gasté 5 mil en el súper con Mercado Pago", "compré 100 dólares a 1350 con el banco", "pagué Claude, 20 dólares"), te muestra qué entendió, confirmás con <b>SÍ</b>, y cuando abrís la app acá aparecen solos. Poné tu número (el mismo con el que le escribís al bot).</p>
       <div class="campo" style="max-width:320px">
         <label>Mi número de WhatsApp</label>
         <input type="text" inputmode="tel" id="wa-tel" placeholder="Ej: 5492920000000" onchange="guardarWaTel(this.value)">
@@ -5121,7 +5121,10 @@ function svFecha(iso){
 }
 
 /* ============ CONEXIÓN CON WHATSAPP (cola de movimientos) ============ */
-const WA_WORKER_URL='https://gestion-campo-whatsapp.eliasfarah166.workers.dev';
+// ⚠️ CAMBIAR por la URL de TU worker personal de WhatsApp una vez que lo subas
+// a Cloudflare (ej: https://mi-plata-whatsapp.TUUSUARIO.workers.dev).
+// Mientras diga 'PENDIENTE', la función de abajo no intenta conectarse.
+const WA_WORKER_URL='https://PENDIENTE.workers.dev';
 // Guarda el número de WhatsApp del usuario (para consultar su cola).
 function guardarWaTel(v){
   const tel=(''+v).replace(/\D/g,'');
@@ -5131,6 +5134,7 @@ function guardarWaTel(v){
 // Manda al worker la config real del campo (actividades, cuentas, rubros)
 // para que la IA del bot de WhatsApp interprete con TUS datos, no genéricos.
 async function sincronizarConfigWhats(){
+  if(WA_WORKER_URL.includes('PENDIENTE')) return;
   const tel=(alm.getItem('campo_wa_tel')||'').replace(/\D/g,'');
   if(!tel) return;
   try{
@@ -5147,6 +5151,7 @@ async function sincronizarConfigWhats(){
 // Revisa la cola del worker y carga automáticamente los movimientos que
 // mandaste por WhatsApp (ya confirmados con SÍ en el chat). Se llama al abrir.
 async function revisarColaWhats(silencioso){
+  if(WA_WORKER_URL.includes('PENDIENTE')){ if(!silencioso) toast('Todavía no configuraste el worker de WhatsApp','error'); return; }
   const tel=(alm.getItem('campo_wa_tel')||'').replace(/\D/g,'');
   if(!tel){ if(!silencioso) toast('Primero cargá tu número de WhatsApp en Alertas y respaldo','error'); return; }
   let lista;
@@ -5167,10 +5172,11 @@ async function revisarColaWhats(silencioso){
   lista.forEach(m=>{
     keysProcesadas.push(m.key);
     if(m.externalId && yaCargados.has(m.externalId)) return; // ya estaba
+    const esCompra = m.montoDest!=null;         // compra de dólares (pase con destino USD)
     const obj={
       id:Date.now()+''+Math.random().toString(36).slice(2,6),
       waId:m.externalId||null,
-      tipo:m.tipo==='transfer'?'egreso':m.tipo,
+      tipo:(m.tipo==='transfer'||esCompra)?'egreso':m.tipo,
       fecha:m.fecha||new Date().toISOString().slice(0,10),
       monto:Math.abs(Number(m.monto)||0),
       cta:m.cta||'',
@@ -5179,9 +5185,12 @@ async function revisarColaWhats(silencioso){
       act:m.act||'',
       cat:m.cat||'Sin categoría',
       det:(m.det||'')+(m.det?' ':'')+'(cargado por WhatsApp)',
-      interno:m.tipo==='transfer',
+      interno:(m.tipo==='transfer'||m.interno===true||esCompra),
       financiero:false
     };
+    // Dólares: gasto/ingreso en USD, o compra de dólares
+    if(m.mon==='usd'){ obj.mon='usd'; if(m.tc) obj.tc=Number(m.tc); }
+    if(esCompra){ obj.montoDest=Number(m.montoDest); obj.monDest='usd'; if(m.tc) obj.tc=Number(m.tc); }
     datos.push(obj);
     agregados++;
   });
