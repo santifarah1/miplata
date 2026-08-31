@@ -677,7 +677,7 @@ try{if(localStorage.getItem('campo_tema')==='1')document.body.classList.add('osc
   <!-- ===== MOVIMIENTOS ===== -->
   <div class="vista" id="v-mov">
     <div class="filtros">
-      <input type="text" id="busca" placeholder="Buscar (subcategoría, detalle, cuenta, comercio...)" oninput="renderTabla()" style="flex:1;min-width:150px">
+      <input type="text" id="busca" placeholder="Buscar (detalle, cuenta, comercio...)" oninput="renderTabla()" style="flex:1;min-width:150px">
       <select id="f-tipo" onchange="renderTabla()">
         <option value="">Todos</option>
         <option value="ingreso">Ingresos</option>
@@ -694,7 +694,7 @@ try{if(localStorage.getItem('campo_tema')==='1')document.body.classList.add('osc
     <div class="panel" style="padding:0;overflow:hidden">
       <div class="tabla-wrap">
         <table id="tabla">
-          <thead><tr><th>Fecha</th><th>Detalle</th><th>Cuenta</th><th>Categoría</th><th>Subcategoría</th><th>Tipo</th><th style="text-align:right">Monto</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Detalle</th><th>Cuenta</th><th>Categoría</th><th>Tipo</th><th style="text-align:right">Monto</th><th></th></tr></thead>
           <tbody id="tabla-body"></tbody>
         </table>
         <div id="tabla-centinela" style="display:none;text-align:center;padding:14px;color:var(--tinta-suave);font-size:13px">Cargando más…</div>
@@ -1064,7 +1064,7 @@ try{if(localStorage.getItem('campo_tema')==='1')document.body.classList.add('osc
       <div class="tipo-toggle">
         <button id="tg-ing" onclick="setTipo('ingreso')">Ingreso</button>
         <button id="tg-egr" onclick="setTipo('egreso')">Egreso</button>
-        <button id="tg-tra" onclick="setTipo('transfer')" title="Consumo interno / pase entre actividades">Transf.</button>
+        <button id="tg-tra" onclick="setTipo('dolar')" title="Comprar dólares: pagás pesos y recibís dólares">💵 Dólares</button>
       </div>
       <p class="mini-nota" id="nota-transfer" style="display:none">Pase entre dos categorías: no mueve plata, sólo reimputa. Casi nunca hace falta en finanzas personales — para mover plata entre cuentas propias usá "Egreso" + "Es un pase entre cuentas".</p>
     </div>
@@ -1082,6 +1082,17 @@ try{if(localStorage.getItem('campo_tema')==='1')document.body.classList.add('osc
         <input type="text" id="m-monto" placeholder="Ej: 1.500,50" inputmode="decimal" oninput="ecoMonto()" autocomplete="off" style="flex:1;min-width:0">
       </div>
       <p class="mini-nota" id="eco-monto">Coma para los centavos y punto para los miles: 1.500,50 son mil quinientos con cincuenta.</p>
+    </div>
+    <div id="wrap-dolar" style="display:none">
+      <div class="campo">
+        <label>Dólares que recibís (US$)</label>
+        <input type="text" id="d-usd" placeholder="Ej: 100" inputmode="decimal" oninput="ecoDolar()" autocomplete="off">
+      </div>
+      <div class="campo">
+        <label>Cuenta de la que salen los pesos</label>
+        <input type="text" id="d-cta" list="ctas" placeholder="Ej: Banco, Mercado Pago">
+      </div>
+      <p class="mini-nota" id="eco-dolar" style="margin-top:-4px">Poné arriba los pesos que pagás y acá los dólares que te dan. La app calcula el tipo de cambio y suma los dólares a tu cuenta Dólares.</p>
     </div>
     <div class="campo" id="wrap-tc" style="display:none">
       <label>Tipo de cambio (pesos por dólar)</label>
@@ -1158,7 +1169,7 @@ try{if(localStorage.getItem('campo_tema')==='1')document.body.classList.add('osc
       <input type="text" id="m-prov" list="provs" placeholder="Ej: Coto, YPF, Juan...">
       <datalist id="provs"></datalist>
     </div>
-    <div class="campo">
+    <div class="campo" style="display:none">
       <label>Subcategoría</label>
       <div style="display:flex;gap:8px">
         <input type="text" id="m-cat" list="cats" placeholder="Ej: súper, nafta, alquiler..." style="flex:1;min-width:0" onchange="autoActRubro()">
@@ -1821,19 +1832,45 @@ function setTipo(t){
   tipoActual=t;
   document.getElementById('tg-ing').className=t==='ingreso'?'on-ing':'';
   document.getElementById('tg-egr').className=t==='egreso'?'on-egr':'';
-  document.getElementById('tg-tra').className=t==='transfer'?'on-tra':'';
+  document.getElementById('tg-tra').className=t==='dolar'?'on-tra':'';
   const esT=t==='transfer';
-  document.getElementById('wrap-act-normal').style.display=esT?'none':'block';
+  const esD=t==='dolar';
+  // Modo comprar dólares: formulario propio y simple, sin selector de moneda ni
+  // checkbox de pase. Pesos arriba (monto), dólares y cuenta en el bloque dólar.
+  document.getElementById('wrap-dolar').style.display=esD?'block':'none';
+  document.getElementById('m-moneda').style.display=esD?'none':'';
+  if(esD){
+    document.getElementById('m-moneda').value='ars';
+    document.getElementById('lbl-monto').textContent='Pesos que pagás';
+    document.getElementById('m-monto').placeholder='Ej: 135.000';
+  }else{
+    document.getElementById('lbl-monto').textContent='Monto';
+    document.getElementById('m-monto').placeholder='Ej: 1.500,50';
+  }
+  document.getElementById('wrap-tc').style.display='none';
+  document.getElementById('wrap-act-normal').style.display=(esT||esD)?'none':'block';
   document.getElementById('wrap-act-transfer').style.display=esT?'block':'none';
-  document.getElementById('wrap-interno').style.display=esT?'none':'block';
-  document.getElementById('wrap-financiero').style.display=esT?'none':'block';
-  document.getElementById('wrap-cta').style.display=esT?'none':'block';
-  document.getElementById('wrap-prov').style.display=esT?'none':'block';
-  document.getElementById('wrap-plazo').style.display=esT?'none':'block';
+  document.getElementById('wrap-interno').style.display=(esT||esD)?'none':'block';
+  document.getElementById('wrap-financiero').style.display=(esT||esD)?'none':'block';
+  document.getElementById('wrap-cta').style.display=(esT||esD)?'none':'block';
+  document.getElementById('wrap-prov').style.display=(esT||esD)?'none':'block';
+  document.getElementById('wrap-plazo').style.display=(esT||esD)?'none':'block';
   document.getElementById('nota-transfer').style.display=esT?'block':'none';
-  if(esT){document.getElementById('m-plazo').checked=false;document.getElementById('wrap-venc').style.display='none'}
+  if(esT||esD){document.getElementById('m-plazo').checked=false;document.getElementById('wrap-venc').style.display='none'}
   else togglePlazo();
-  toggleInterno();
+  if(esD)ecoDolar(); else toggleInterno();
+}
+// Eco de compra de dólares: muestra a qué tipo de cambio comprás.
+function ecoDolar(){
+  const el=document.getElementById('eco-dolar');if(!el)return;
+  const pesos=parseMontoAR(document.getElementById('m-monto').value);
+  const usd=parseMontoAR(document.getElementById('d-usd').value);
+  if(pesos>0&&usd>0){
+    const tc=pesos/usd;
+    el.innerHTML=`Comprás <b>US$${usd.toLocaleString('es-AR',{maximumFractionDigits:2})}</b> con <b>$${pesos.toLocaleString('es-AR')}</b> → tipo de cambio <b>$${tc.toLocaleString('es-AR',{maximumFractionDigits:2})}</b> por dólar.`;
+  }else{
+    el.innerHTML='Poné arriba los pesos que pagás y acá los dólares que te dan. La app calcula el tipo de cambio y suma los dólares a tu cuenta Dólares.';
+  }
 }
 // Pase entre cuentas propias: sale de una caja y entra en otra. No es resultado
 // del campo, así que no tiene sentido que sea a plazo ni que tenga proveedor.
@@ -1920,7 +1957,8 @@ function abrirModal(id){
   document.getElementById('det-iva').open=false;
   if(id){
     const m=datos.find(d=>d.id===id);
-    setTipo(m.tipo);
+    const esCompraDolar=(m.montoDest!=null&&m.monDest==='usd');
+    setTipo(esCompraDolar?'dolar':m.tipo);
     document.getElementById('m-fecha').value=m.fecha;
     // Al editar se muestra en formato argentino, igual que como se carga.
     // Antes salía "2450000.5" cuando el usuario había escrito "2.450.000,50".
@@ -1948,7 +1986,11 @@ function abrirModal(id){
     document.getElementById('m-moneda').value=(m.mon==='usd')?'usd':'ars';
     document.getElementById('m-tc').value=m.tc?aMontoAR(m.tc):'';
     document.getElementById('m-usd-dest').value=(m.montoDest!=null)?aMontoAR(m.montoDest):'';
+    // compra de dólares (modo dolar)
+    document.getElementById('d-usd').value=(m.montoDest!=null)?aMontoAR(m.montoDest):'';
+    document.getElementById('d-cta').value=m.cta||'';
     togglePlazo();toggleInterno();toggleMonedaMov();
+    if(esCompraDolar)ecoDolar();
   }else{
     setTipo('egreso');
     document.getElementById('m-fecha').value=new Date().toISOString().slice(0,10);
@@ -1970,6 +2012,8 @@ function abrirModal(id){
     document.getElementById('m-moneda').value='ars';
     document.getElementById('m-tc').value='';
     document.getElementById('m-usd-dest').value='';
+    document.getElementById('d-usd').value='';
+    document.getElementById('d-cta').value='';
     togglePlazo();toggleInterno();toggleMonedaMov();
   }
   actualizarCats();
@@ -2089,6 +2133,35 @@ function guardar(){
   const neto=parseMontoAR(document.getElementById('m-neto').value)||null;
   const iva=parseMontoAR(document.getElementById('m-iva').value)||null;
   let obj;
+  if(tipoActual==='dolar'){
+    // Comprar dólares: pagás pesos (monto) y recibís dólares (d-usd) en tu
+    // cuenta Dólares. Siempre es un pase entre cuentas: nunca cuenta como
+    // gasto ni como ingreso. El tipo se fija acá, no depende de nada de arriba.
+    const usd=parseMontoAR(document.getElementById('d-usd').value);
+    const ctaOrigen=formaCanonica(document.getElementById('d-cta').value,'cta');
+    if(!usd){toast('¿Cuántos dólares recibís? Escribilo en números (ej: 100).','error');return}
+    if(!ctaOrigen){toast('¿De qué cuenta salen los pesos? (ej: Banco)','error');return}
+    obj={
+      id:editandoId||Date.now()+''+Math.random().toString(36).slice(2,6),
+      tipo:'egreso',            // sale de la cuenta de pesos
+      fecha,monto:Math.abs(monto),
+      cta:ctaOrigen,
+      ctaDest:'Dólares',
+      montoDest:Math.abs(usd),
+      monDest:'usd',
+      tc:Math.abs(monto)/usd,
+      act:actEstructura(),
+      cat:'Compra de dólares',
+      det:document.getElementById('m-det').value.trim(),
+      interno:true,             // pase entre cuentas: no es gasto ni ingreso
+      financiero:false
+    };
+    if(editandoId){const i=datos.findIndex(d=>d.id===editandoId);if(i>=0)datos[i]=obj}
+    else datos.push(obj);
+    guardarLS();cerrarModal();render();renderTabla();actualizarAnios();
+    toast('Compra de dólares cargada ✓');
+    return;
+  }
   if(tipoActual==='transfer'){
     const o=document.getElementById('m-origen').value, de=document.getElementById('m-destino').value;
     if(o===de){toast('La categoría que entrega y la que recibe no pueden ser la misma','error');return}
@@ -2779,7 +2852,6 @@ function filaMovHTML(x){
     <td>${detTxt||'<span style="color:var(--tinta-suave)">—</span>'}${x.mon==='usd'?` <span class="act-tag" style="background:var(--campo-suave);color:var(--campo-hondo)">US$${x.monto.toLocaleString('es-AR',{maximumFractionDigits:2})}${x.tc?' @ '+Math.round(x.tc).toLocaleString('es-AR'):''}</span>`:''}${x.montoDest!=null?` <span class="act-tag" style="background:var(--campo-suave);color:var(--campo-hondo)">compra US$${x.montoDest.toLocaleString('es-AR',{maximumFractionDigits:2})}${x.tc?' @ '+Math.round(x.tc).toLocaleString('es-AR'):''}</span>`:''}${x.prov?` <span class="act-tag">👤 ${esc(x.prov)}</span>`:''}${x.cant?` <span class="act-tag">cant: ${x.cant.toLocaleString('es-AR',{maximumFractionDigits:3})}</span>`:''}${x.interno?' <span class="act-tag" style="background:rgba(74,107,138,.15);color:var(--cielo);white-space:nowrap" title="Pase entre cuentas propias o ajuste: la plata solo cambió de caja, no es ingreso ni gasto">pase interno</span>':''}${x.financiero?' <span class="act-tag" style="background:rgba(107,74,46,.15);color:var(--tierra)">ahorro</span>':''}${etiquetaPlazo(x)}</td>
     <td>${ctaCell}</td>
     <td>${actCell}</td>
-    <td>${esc(x.cat)}</td>
     <td>${pill}</td>
     ${monto}
     <td><button class="borrar" onclick="event.stopPropagation();borrar('${x.id}')">✕</button></td>
@@ -2966,6 +3038,7 @@ function parseFecha(v){
 // dudas con la coma: si alguien pone 1,500 ve al toque que son $1,50.
 function ecoMonto(){
   const el=document.getElementById('eco-monto');if(!el)return;
+  if(tipoActual==='dolar'){ecoDolar();return;}
   const v=document.getElementById('m-monto').value.trim();
   const n=parseMontoAR(v);
   const monSel=document.getElementById('m-moneda');
