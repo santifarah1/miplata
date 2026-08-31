@@ -1085,10 +1085,17 @@ try{if(localStorage.getItem('campo_tema')==='1')document.body.classList.add('osc
     </div>
     <div id="wrap-dolar" style="display:none">
       <div class="campo">
-        <label>Dólares que recibís (US$)</label>
-        <input type="text" id="d-usd" placeholder="Ej: 100" inputmode="decimal" oninput="ecoDolar()" autocomplete="off">
+        <label>¿Qué querés hacer?</label>
+        <select id="d-modo" onchange="toggleDolarModo()">
+          <option value="comprar">Comprar dólares ahora (pago con pesos)</option>
+          <option value="tengo">Cargar dólares que ya tengo ahorrados</option>
+        </select>
       </div>
       <div class="campo">
+        <label>Dólares (US$)</label>
+        <input type="text" id="d-usd" placeholder="Ej: 100" inputmode="decimal" oninput="ecoDolar()" autocomplete="off">
+      </div>
+      <div class="campo" id="wrap-d-cta">
         <label>Cuenta de la que salen los pesos</label>
         <input type="text" id="d-cta" list="ctas" placeholder="Ej: Banco, Mercado Pago">
       </div>
@@ -1858,13 +1865,32 @@ function setTipo(t){
   document.getElementById('nota-transfer').style.display=esT?'block':'none';
   if(esT||esD){document.getElementById('m-plazo').checked=false;document.getElementById('wrap-venc').style.display='none'}
   else togglePlazo();
-  if(esD)ecoDolar(); else toggleInterno();
+  if(esD){document.getElementById('d-modo').value=document.getElementById('d-modo').value||'comprar';toggleDolarModo();ecoDolar();} else toggleInterno();
 }
-// Eco de compra de dólares: muestra a qué tipo de cambio comprás.
+// Alterna entre "comprar dólares ahora" y "cargar dólares que ya tengo".
+function toggleDolarModo(){
+  const tengo=document.getElementById('d-modo').value==='tengo';
+  // El campo de pesos (monto) y la cuenta origen solo aplican si comprás ahora.
+  const wrapMonto=document.getElementById('lbl-monto').closest('.campo');
+  if(wrapMonto)wrapMonto.style.display=tengo?'none':'block';
+  document.getElementById('wrap-d-cta').style.display=tengo?'none':'block';
+  document.getElementById('lbl-monto').textContent='Pesos que pagás';
+  ecoDolar();
+}
+// Eco de dólares: distinto según compres ahora o cargues lo que ya tenés.
 function ecoDolar(){
   const el=document.getElementById('eco-dolar');if(!el)return;
-  const pesos=parseMontoAR(document.getElementById('m-monto').value);
+  const tengo=document.getElementById('d-modo').value==='tengo';
   const usd=parseMontoAR(document.getElementById('d-usd').value);
+  if(tengo){
+    const tc=tcMEPhoy();
+    el.innerHTML=usd>0
+      ? (tc?`Cargás <b>US$${usd.toLocaleString('es-AR',{maximumFractionDigits:2})}</b> como saldo inicial de tu cuenta Dólares (≈ $${Math.round(usd*tc).toLocaleString('es-AR')} al MEP de hoy). No cuenta como ingreso ni gasto.`
+           :`Cargás <b>US$${usd.toLocaleString('es-AR',{maximumFractionDigits:2})}</b> como saldo inicial de tu cuenta Dólares. No cuenta como ingreso ni gasto.`)
+      : 'Poné cuántos dólares tenés guardados. Se cargan como saldo de tu cuenta Dólares, sin contar como gasto ni ingreso.';
+    return;
+  }
+  const pesos=parseMontoAR(document.getElementById('m-monto').value);
   if(pesos>0&&usd>0){
     const tc=pesos/usd;
     el.innerHTML=`Comprás <b>US$${usd.toLocaleString('es-AR',{maximumFractionDigits:2})}</b> con <b>$${pesos.toLocaleString('es-AR')}</b> → tipo de cambio <b>$${tc.toLocaleString('es-AR',{maximumFractionDigits:2})}</b> por dólar.`;
@@ -1958,7 +1984,11 @@ function abrirModal(id){
   if(id){
     const m=datos.find(d=>d.id===id);
     const esCompraDolar=(m.montoDest!=null&&m.monDest==='usd');
-    setTipo(esCompraDolar?'dolar':m.tipo);
+    const esDolarTengo=(m.interno&&m.mon==='usd'&&m.cta==='Dólares'&&m.montoDest==null);
+    setTipo((esCompraDolar||esDolarTengo)?'dolar':m.tipo);
+    if(esDolarTengo)document.getElementById('d-modo').value='tengo';
+    else if(esCompraDolar)document.getElementById('d-modo').value='comprar';
+    toggleDolarModo();
     document.getElementById('m-fecha').value=m.fecha;
     // Al editar se muestra en formato argentino, igual que como se carga.
     // Antes salía "2450000.5" cuando el usuario había escrito "2.450.000,50".
@@ -1987,10 +2017,10 @@ function abrirModal(id){
     document.getElementById('m-tc').value=m.tc?aMontoAR(m.tc):'';
     document.getElementById('m-usd-dest').value=(m.montoDest!=null)?aMontoAR(m.montoDest):'';
     // compra de dólares (modo dolar)
-    document.getElementById('d-usd').value=(m.montoDest!=null)?aMontoAR(m.montoDest):'';
+    document.getElementById('d-usd').value=(m.montoDest!=null)?aMontoAR(m.montoDest):(esDolarTengo?aMontoAR(m.monto):'');
     document.getElementById('d-cta').value=m.cta||'';
     togglePlazo();toggleInterno();toggleMonedaMov();
-    if(esCompraDolar)ecoDolar();
+    if(esCompraDolar||esDolarTengo)ecoDolar();
   }else{
     setTipo('egreso');
     document.getElementById('m-fecha').value=new Date().toISOString().slice(0,10);
@@ -2014,6 +2044,7 @@ function abrirModal(id){
     document.getElementById('m-usd-dest').value='';
     document.getElementById('d-usd').value='';
     document.getElementById('d-cta').value='';
+    document.getElementById('d-modo').value='comprar';
     togglePlazo();toggleInterno();toggleMonedaMov();
   }
   actualizarCats();
@@ -2115,7 +2146,8 @@ function guardar(){
   const fecha=document.getElementById('m-fecha').value;
   const monto=parseMontoAR(document.getElementById('m-monto').value);
   if(!fecha){toast('Falta la fecha.','error');return}
-  if(!monto){toast('Falta el monto, o no se entiende lo que escribiste.\n\nPodés escribirlo como quieras: 1500 · 1500,50 · 1.500,50','error');return}
+  const dolarTengo=(tipoActual==='dolar'&&document.getElementById('d-modo').value==='tengo');
+  if(!monto&&!dolarTengo){toast('Falta el monto, o no se entiende lo que escribiste.\n\nPodés escribirlo como quieras: 1500 · 1500,50 · 1.500,50','error');return}
   // Un año mal tipeado (2206 en vez de 2026) entra sin chistar y descoloca
   // los gráficos por mes, la proyección y el cierre de ejercicio.
   const anio=parseInt(fecha.slice(0,4));
@@ -2134,16 +2166,40 @@ function guardar(){
   const iva=parseMontoAR(document.getElementById('m-iva').value)||null;
   let obj;
   if(tipoActual==='dolar'){
-    // Comprar dólares: pagás pesos (monto) y recibís dólares (d-usd) en tu
-    // cuenta Dólares. Siempre es un pase entre cuentas: nunca cuenta como
-    // gasto ni como ingreso. El tipo se fija acá, no depende de nada de arriba.
+    const modo=document.getElementById('d-modo').value;
     const usd=parseMontoAR(document.getElementById('d-usd').value);
+    if(!usd){toast('¿Cuántos dólares? Escribilo en números (ej: 100).','error');return}
+
+    if(modo==='tengo'){
+      // Dólares que ya tenés: saldo inicial de la cuenta Dólares. Es un
+      // movimiento interno en USD (no cuenta como ingreso ni gasto), que solo
+      // suma al saldo de la cuenta. Se valúa al MEP del día para el total.
+      obj={
+        id:editandoId||Date.now()+''+Math.random().toString(36).slice(2,6),
+        tipo:'ingreso',           // suma a la cuenta...
+        interno:true,             // ...pero es un ajuste, no un ingreso real
+        fecha,monto:Math.abs(usd),
+        mon:'usd',
+        cta:'Dólares',
+        act:actEstructura(),
+        cat:'Saldo inicial',
+        det:document.getElementById('m-det').value.trim(),
+        financiero:false
+      };
+      if(editandoId){const i=datos.findIndex(d=>d.id===editandoId);if(i>=0)datos[i]=obj}
+      else datos.push(obj);
+      guardarLS();cerrarModal();render();renderTabla();actualizarAnios();
+      toast('Dólares cargados en tu cuenta ✓');
+      return;
+    }
+
+    // Comprar dólares ahora: pagás pesos (monto) y recibís dólares. Siempre es
+    // un pase entre cuentas: nunca cuenta como gasto ni ingreso.
     const ctaOrigen=formaCanonica(document.getElementById('d-cta').value,'cta');
-    if(!usd){toast('¿Cuántos dólares recibís? Escribilo en números (ej: 100).','error');return}
     if(!ctaOrigen){toast('¿De qué cuenta salen los pesos? (ej: Banco)','error');return}
     obj={
       id:editandoId||Date.now()+''+Math.random().toString(36).slice(2,6),
-      tipo:'egreso',            // sale de la cuenta de pesos
+      tipo:'egreso',
       fecha,monto:Math.abs(monto),
       cta:ctaOrigen,
       ctaDest:'Dólares',
@@ -2153,7 +2209,7 @@ function guardar(){
       act:actEstructura(),
       cat:'Compra de dólares',
       det:document.getElementById('m-det').value.trim(),
-      interno:true,             // pase entre cuentas: no es gasto ni ingreso
+      interno:true,
       financiero:false
     };
     if(editandoId){const i=datos.findIndex(d=>d.id===editandoId);if(i>=0)datos[i]=obj}
