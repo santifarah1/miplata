@@ -5294,8 +5294,8 @@ function svFecha(iso){
 /* ============ CONEXIÓN CON WHATSAPP (cola de movimientos) ============ */
 // ⚠️ CAMBIAR por la URL de TU worker de Telegram una vez que lo subas a
 // Cloudflare (ej: https://mi-plata-telegram.TUUSUARIO.workers.dev).
-// Mientras diga 'PENDIENTE', la función de abajo no intenta conectarse.
-const WA_WORKER_URL='https://mi-plata-telegram.eliasfarah166.workers.dev/';
+// No importa si le dejás una barra al final: se saca sola.
+const WA_WORKER_URL=('https://PENDIENTE.workers.dev').replace(/\/+$/,'');
 // Guarda el ID de chat de Telegram (para consultar su cola).
 function guardarWaTel(v){
   const tel=(''+v).replace(/\D/g,'');
