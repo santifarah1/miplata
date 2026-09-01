@@ -2947,7 +2947,7 @@ function filaMovHTML(x){
     :x.cta?`<span class="act-tag">${esc(x.cta)}</span>`:'<span style="color:var(--tinta-suave)">—</span>';
   return `<tr onclick="abrirModal('${x.id}')" style="cursor:pointer">
     <td style="white-space:nowrap">${x.fecha}</td>
-    <td>${detTxt||'<span style="color:var(--tinta-suave)">—</span>'}${x.mon==='usd'?` <span class="act-tag" style="background:var(--campo-suave);color:var(--campo-hondo)">US$${x.monto.toLocaleString('es-AR',{maximumFractionDigits:2})}${x.tc?' @ '+Math.round(x.tc).toLocaleString('es-AR'):''}</span>`:''}${x.montoDest!=null?` <span class="act-tag" style="background:var(--campo-suave);color:var(--campo-hondo)">compra US$${x.montoDest.toLocaleString('es-AR',{maximumFractionDigits:2})}${x.tc?' @ '+Math.round(x.tc).toLocaleString('es-AR'):''}</span>`:''}${x.prov?` <span class="act-tag">👤 ${esc(x.prov)}</span>`:''}${x.cant?` <span class="act-tag">cant: ${x.cant.toLocaleString('es-AR',{maximumFractionDigits:3})}</span>`:''}${x.interno?' <span class="act-tag" style="background:rgba(74,107,138,.15);color:var(--cielo);white-space:nowrap" title="Pase entre cuentas propias o ajuste: la plata solo cambió de caja, no es ingreso ni gasto">pase interno</span>':''}${x.financiero?' <span class="act-tag" style="background:rgba(107,74,46,.15);color:var(--tierra)">ahorro</span>':''}${etiquetaPlazo(x)}</td>
+    <td>${detTxt||'<span style="color:var(--tinta-suave)">—</span>'}${x.mon==='usd'?` <span class="act-tag" style="background:var(--campo-suave);color:var(--campo-hondo)">US$${x.monto.toLocaleString('es-AR',{maximumFractionDigits:2})}${x.tc?' @ '+Math.round(x.tc).toLocaleString('es-AR'):''}</span>`:''}${x.montoDest!=null?` <span class="act-tag" style="background:var(--campo-suave);color:var(--campo-hondo)">compra US$${x.montoDest.toLocaleString('es-AR',{maximumFractionDigits:2})}${x.tc?' @ '+Math.round(x.tc).toLocaleString('es-AR'):''}</span>`:''}${x.prov?` <span class="act-tag">👤 ${esc(x.prov)}</span>`:''}${x.cant?` <span class="act-tag">cant: ${x.cant.toLocaleString('es-AR',{maximumFractionDigits:3})}</span>`:''}${x.interno?' <span class="act-tag" style="background:rgba(74,107,138,.15);color:var(--cielo);white-space:nowrap" title="Pase entre cuentas propias o ajuste: la plata solo cambió de caja, no es ingreso ni gasto">pase interno</span>':''}${x.financiero?' <span class="act-tag" style="background:rgba(107,74,46,.15);color:var(--tierra)">ahorro</span>':''}${etiquetaPlazo(x)}${x.origen==='telegram'?' <span class="act-tag" style="background:rgba(61,107,176,.14);color:var(--cielo)" title="Cargado desde el bot de Telegram">✈ Telegram</span>':''}</td>
     <td>${ctaCell}</td>
     <td>${actCell}</td>
     <td>${pill}</td>
@@ -5295,7 +5295,7 @@ function svFecha(iso){
 // ⚠️ CAMBIAR por la URL de TU worker de Telegram una vez que lo subas a
 // Cloudflare (ej: https://mi-plata-telegram.TUUSUARIO.workers.dev).
 // No importa si le dejás una barra al final: se saca sola.
-const WA_WORKER_URL=('https://mi-plata-telegram.eliasfarah166.workers.dev').replace(/\/+$/,'');
+const WA_WORKER_URL=('https://PENDIENTE.workers.dev').replace(/\/+$/,'');
 // Guarda el ID de chat de Telegram (para consultar su cola).
 function guardarWaTel(v){
   const tel=(''+v).replace(/\D/g,'');
@@ -5355,7 +5355,8 @@ async function revisarColaWhats(silencioso){
       prov:m.prov||'',
       act:m.act||'',
       cat:m.cat||'Sin categoría',
-      det:(m.det||'')+(m.det?' ':'')+'(cargado por WhatsApp)',
+      det:(m.det||'').trim(),
+      origen:'telegram',
       interno:(m.tipo==='transfer'||m.interno===true||esCompra),
       financiero:false
     };
