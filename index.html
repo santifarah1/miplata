@@ -5179,8 +5179,10 @@ async function iniciar(){
   actualizarAnios();render();cargarDolar();cargarIndices();chequearBackup();chequearFechas();driveArranque();
   // Revisar si hay movimientos cargados por WhatsApp esperando en la cola.
   revisarColaWhats(true);
-  // Mandar la config real del campo al bot (para que interprete con tus datos).
+  // Mandar la config real al bot (para que interprete con tus datos).
   sincronizarConfigWhats();
+  // Mandar un resumen liviano de movimientos, para el reporte semanal del lunes.
+  enviarSnapshotResumen();
 
   if(alm.recuperado){
     let f=alm.fechaRecuperado;
@@ -5295,7 +5297,7 @@ function svFecha(iso){
 // ⚠️ CAMBIAR por la URL de TU worker de Telegram una vez que lo subas a
 // Cloudflare (ej: https://mi-plata-telegram.TUUSUARIO.workers.dev).
 // No importa si le dejás una barra al final: se saca sola.
-const WA_WORKER_URL=('https://mi-plata-telegram.eliasfarah166.workers.dev').replace(/\/+$/,'');
+const WA_WORKER_URL=('https://PENDIENTE.workers.dev').replace(/\/+$/,'');
 // Guarda el ID de chat de Telegram (para consultar su cola).
 function guardarWaTel(v){
   const tel=(''+v).replace(/\D/g,'');
@@ -5317,6 +5319,33 @@ async function sincronizarConfigWhats(){
       body:JSON.stringify({chatId:tel,actividades:acts,cuentas:cuentas,rubros:rbs})
     });
   }catch(_){/* si falla, el bot usa la lista genérica; no rompe nada */}
+}
+
+// Manda al worker un resumen liviano de los movimientos (solo fecha, tipo, monto
+// en pesos, categoría e interno) para que arme el reporte semanal del lunes.
+// No manda detalles, cuentas ni notas: lo mínimo para el total y las categorías.
+async function enviarSnapshotResumen(){
+  if(WA_WORKER_URL.includes('PENDIENTE')) return;
+  const tel=(alm.getItem('campo_wa_tel')||'').replace(/\D/g,'');
+  if(!tel) return;
+  try{
+    // Solo los últimos ~40 días: alcanza para el resumen semanal y es liviano.
+    const corte=new Date(); corte.setDate(corte.getDate()-40);
+    const corteISO=corte.toISOString().slice(0,10);
+    const movs=(typeof datos!=='undefined'?datos:[])
+      .filter(d=>d && d.fecha>=corteISO && !d.plazo)   // los pendientes no cuentan hasta pagarse
+      .map(d=>({
+        fecha:d.fecha,
+        tipo:d.tipo,
+        monto:Math.round(enPesos(d)),                  // siempre en pesos, convierte USD
+        cat:(typeof actEtiqueta==='function'?actEtiqueta(d.act):d.act)||'Sin categoría',
+        interno:!!d.interno
+      }));
+    await fetch(WA_WORKER_URL+'/snapshot',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chatId:tel,movimientos:movs})
+    });
+  }catch(_){/* si falla, simplemente no se actualiza el snapshot; no rompe nada */}
 }
 
 // Revisa la cola del worker y carga automáticamente los movimientos que
